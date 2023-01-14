@@ -1,5 +1,7 @@
 #! /udd/d/dbohdan/bin/joker
 
+(def db-file "guestbook.bolt")
+
 (defn parse-query [query]
   (as-> query x
     (joker.string/split x "&")
@@ -13,6 +15,10 @@
   (try
     (parse-query query)
     (catch Error e {:e e})))
+
+(defn rate-limited? [remote] false)
+
+(defn add-record [remote name contact message])
 
 (defn form [action]
   [:form {:method :post
@@ -33,24 +39,38 @@
    [:div
     [:input {:type :submit}]]])
 
-(defn cgi [env input]
-  (str
-   "Content-Type: text/html\r\n\r\n"
-   "<!doctype html>"
-   (joker.hiccup/html
-    {:mode :html}
-    [:html {:lang "en"}
-     [:head
-      [:title "Joker CGI test"]]
-     [:body
-      [:code (prn-str env)]
-      [:hr]
-      [:code
-       (prn-str
-        (parse-query-default input))]
-      (form (get env "SCRIPT_NAME" ""))]])))
+(defn cgi [db env input]
+  (let [query (parse-query-default input)]
+    (when (= (get query "REQUEST_METHOD" "") "POST")
+      (let [remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))]
+        (when-not (rate-limited? remote)
+          (add-record
+           remote
+           (get query "name" "")
+           (get query "contact" "")
+           (get query "message" "")))))
+    (str
+     "Content-Type: text/html\r\n\r\n"
+     "<!doctype html>"
+     (joker.hiccup/html
+      {:mode :html}
+      [:html {:lang "en"}
+       [:head
+        [:title "Joker CGI test"]]
+       [:body
+        [:code (prn-str env)]
+        [:hr]
+        [:code
+         (prn-str query)]
 
-(print
- (cgi
-  (joker.os/env)
-  (slurp *in*)))
+        (form (get env "SCRIPT_NAME" ""))]]))))
+
+(let [db (joker.bolt/open db-file 0600)]
+  (joker.bolt/create-bucket-if-not-exists db "rate-limit")
+  (joker.bolt/create-bucket-if-not-exists db "entries")
+  (print
+   (cgi
+    db
+    (joker.os/env)
+    (slurp *in*)))
+  (joker.bolt/close db))
