@@ -11,27 +11,36 @@
 (def min-wait (* 60 60))
 
 (def css "
-* {
+*, *::before, *::after {
   box-sizing: border-box;
+}
+
+input, textarea {
+  font: inherit;
+}
+
+body {
   font-family: serif;
   font-size: 16px;
-}
-body {
   margin: 0 1rem;
 }
+
 article {
   border: solid 0.15rem;
   border-radius: 12px;
   margin: 1rem 0;
   padding-left: 1rem;
 }
+
 form {
   display: flex;
   flex-direction: column;
 }
+
 form > div {
   padding: 0.25rem 0;
 }
+
 form input[type='text'], form textarea {
   margin-top: 0.15rem;
   width: 100%;
