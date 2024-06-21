@@ -3,10 +3,44 @@
 ;; Copyright (c) 2024 D. Bohdan.
 ;; License: MIT.
 
+;; Change to `false` in production.
+(def debug true)
+
 (def db-file "guestbook.bolt")
-(def entries-bucket "entries")
-(def rate-limit-bucket "rate-limit")
-(def rate-limit (* 60 60))
+;; The minimum wait time in seconds for posting from the same remote address.
+(def min-wait (* 60 60))
+
+(def css "
+* {
+  box-sizing: border-box;
+  font-family: serif;
+  font-size: 16px;
+}
+body {
+  margin: 0 1rem;
+}
+article {
+  border: solid 0.15rem;
+  border-radius: 12px;
+  margin: 1rem 0;
+  padding-left: 1rem;
+}
+form {
+  display: flex;
+  flex-direction: column;
+}
+form > div {
+  padding: 0.25rem 0;
+}
+form input[type='text'], form textarea {
+  margin-top: 0.15rem;
+  width: 100%;
+}
+")
+
+(def buckets
+  {:entries "entries"
+   :rate-limit "rate-limit"})
 
 (def msgcat
   {:name "Name:"
@@ -50,24 +84,24 @@
   [db remote current-timestamp]
   (let [last-timestamp
         (->
-         (joker.bolt/get db rate-limit-bucket remote)
+         (joker.bolt/get db (:rate-limit buckets) remote)
          (or "0")
          (joker.strconv/parse-int 10 0))]
-    (< (- current-timestamp last-timestamp) rate-limit)))
+    (> min-wait (- current-timestamp last-timestamp))))
 
 (defn add-entry
   "Adds an entry to the guestbook and rate-limiting table."
   [db contact message name remote]
   (joker.bolt/put db
-                  entries-bucket
-                  (str (joker.bolt/next-sequence db entries-bucket))
+                  (:entries buckets)
+                  (str (joker.bolt/next-sequence db (:entries buckets)))
                   (joker.json/write-string
                    {:contact contact
                     :message message
                     :name name
                     :remote remote}))
   (joker.bolt/put db
-                  rate-limit-bucket
+                  (:rate-limit buckets)
                   remote
                   (str (unix-now))))
 
@@ -85,7 +119,7 @@
 
 (defn entries-in-db [db]
   (->>
-   (joker.bolt/by-prefix db entries-bucket "")
+   (joker.bolt/by-prefix db (:entries buckets) "")
    (map (fn [[id json]]
           [(joker.strconv/parse-int id 10 0) json]))
    (sort)
@@ -106,7 +140,8 @@
              :name :contact}]]
    [:div
     [:label {:for :message} (msgcat :message)]
-    [:textarea {:name :message}]]
+    [:textarea {:id :message
+                :name :message}]]
    [:div
     [:input {:type :submit}]]])
 
@@ -125,7 +160,8 @@
         (if (joker.string/blank? title-prefix)
           ""
           (str title-prefix " - "))
-        (msgcat :title))]]
+        (msgcat :title))]
+      [:style (joker.hiccup/raw-string css)]]
      body])))
 
 (defn error-view [status message]
@@ -162,12 +198,13 @@
               (add-entry db contact message name remote)
               (normal-view db script-name))))
         (normal-view db script-name)))
-    (catch Error _
-      (error-view (:500 statuses) (msgcat :unknown-error)))))
+    (catch Error e
+      (error-view (:500 statuses) (if debug e (msgcat :unknown-error))))))
 
 (let [db (joker.bolt/open db-file 0600)]
-  (joker.bolt/create-bucket-if-not-exists db entries-bucket)
-  (joker.bolt/create-bucket-if-not-exists db rate-limit-bucket)
+  (dorun
+   (for [bucket (vals buckets)]
+     (joker.bolt/create-bucket-if-not-exists db bucket)))
   (print
    (cgi
     db
