@@ -164,6 +164,7 @@ form input[type='text'], form textarea {
     [:html {:lang "en"}
      [:head
       [:meta {:charset "utf-8"}]
+      [:meta {:name "viewport" :content "width=device-width, initial-scale=1.0, user-scalable=yes"}]
       [:title
        (str
         (if (joker.string/blank? title-prefix)
