@@ -104,23 +104,39 @@ input, textarea {
 }
 ")
 
-(def msgcat-strings
-  {:name "Name:"
-   :captcha "Captcha:"
-   :captcha-info "Please solve the challenge <code>%s</code> to post."
-   :captcha-missing "Sorry, the captcha is required."
-   :captcha-wrong "Sorry, the captcha is expired, invalid, or wrong."
-   :contact "Contact:"
-   :contact-in-form "Contact information (will be public):"
-   :message "Message:"
-   :posting-disabled "Posting is currently disabled."
-   :rate-limited (str "Sorry, but your network address has "
-                      "signed the guestbook recently.")
-   :required-field-missing "Sorry, a name and a message are required."
-   :send "Send"
-   :sign "Sign the guestbook"
-   :title "Guestbook"
-   :unknown-error "Sorry, an unknown error has occurred."})
+;; All of the guestbook's messages.
+;; You can change them to customize and localize the guestbook.
+(def msgcat-messages
+  {:name
+   "Name:"
+   :captcha
+   "Captcha:"
+   :captcha-info
+   "Please solve the challenge <code>%s</code> to sign the guestbook."
+   :captcha-missing
+   "Sorry, but to sign the guestbook you must solve the captcha challenge."
+   :captcha-wrong
+   "Sorry, either the solution is wrong, or your captcha is expired or invalid."
+   :contact
+   "Contact:"
+   :contact-in-form
+   "Contact information (will be public):"
+   :message
+   "Message:"
+   :posting-disabled
+   "Posting is currently disabled."
+   :rate-limited
+   "Sorry, but your network address has signed the guestbook recently."
+   :required-field-missing
+   "Sorry, a name and a message are required."
+   :send
+   "Send"
+   :sign
+   "Sign the guestbook"
+   :title
+   "Guestbook"
+   :unknown-error
+   "Sorry, an unknown error has occurred."})
 
 ;; End of user-editable settings.
 
@@ -139,7 +155,7 @@ input, textarea {
 (def secret-key "secret")
 
 (defn msgcat [k & args]
-  (apply format (msgcat-strings k) args))
+  (apply format (msgcat-messages k) args))
 
 (defn parse-query
   "Parses the query part of a URI or a URL-encoded form."
