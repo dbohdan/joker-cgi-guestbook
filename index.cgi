@@ -22,7 +22,7 @@
 ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ;; THE SOFTWARE.
 
-;; Change to `false` in production.
+;; Set to `false` in production.
 (def debug true)
 
 (def db-file "guestbook.bolt")
@@ -34,21 +34,38 @@
   box-sizing: border-box;
 }
 
-input, textarea {
-  font: inherit;
+html {
+  display: flex;
+  justify-content: center;
 }
 
 body {
+  background-color: #eed3d3;
   font-family: serif;
   font-size: 16px;
-  margin: 0 1rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  max-width: 35rem;
 }
 
-article {
+article, form {
+  background-color: white;
   border: solid 0.15rem;
   border-radius: 12px;
   margin: 1rem 0;
-  padding-left: 1rem;
+  padding: 0 1rem;
+}
+
+dl {
+  margin-top: 1rem;
+}
+
+dl, form div {
+  margin-bottom: 1rem;
+}
+
+dt, input[type='submit'], label {
+  font-weight: bold;
 }
 
 form {
@@ -56,13 +73,26 @@ form {
   flex-direction: column;
 }
 
-form > div {
-  padding: 0.25rem 0;
+form div div {
+  margin: 0.5rem 0;
+}
+
+form h2 {
+  margin-bottom: 0.65rem;
 }
 
 form input[type='text'], form textarea {
   margin-top: 0.15rem;
   width: 100%;
+}
+
+form textarea {
+  min-height: 7rem;
+}
+
+input, textarea {
+  border: solid 1px;
+  font: inherit;
 }
 ")
 
@@ -78,6 +108,8 @@ form input[type='text'], form textarea {
    :rate-limited (str "Sorry, but your network address has "
                       "signed the guestbook recently.")
    :required-field-missing "Sorry, a name and a message are required."
+   :send "Send"
+   :sign "Sign the guestbook"
    :title "Guestbook"
    :unknown-error "Sorry, an unknown error has occurred."})
 
@@ -156,22 +188,25 @@ form input[type='text'], form textarea {
 (defn form [action]
   [:form {:method :post
           :action action}
+   [:h2 (:sign msgcat)]
    [:div
-    [:label {:for :name} (msgcat :name)]
-    [:input {:type :text
-             :id :name
-             :name :name}]]
-   [:div
-    [:label {:for :contact} (msgcat :contact-in-form)]
-    [:input {:type :text
-             :id :contact
-             :name :contact}]]
-   [:div
-    [:label {:for :message} (msgcat :message)]
-    [:textarea {:id :message
-                :name :message}]]
-   [:div
-    [:input {:type :submit}]]])
+    [:div
+     [:label {:for :name} (msgcat :name)]
+     [:input {:type :text
+              :id :name
+              :name :name}]]
+    [:div
+     [:label {:for :contact} (msgcat :contact-in-form)]
+     [:input {:type :text
+              :id :contact
+              :name :contact}]]
+    [:div
+     [:label {:for :message} (msgcat :message)]
+     [:textarea {:id :message
+                 :name :message}]]
+    [:div
+     [:input {:type :submit
+              :value (:send msgcat)}]]]])
 
 (defn html-view [status body & {:keys [title-prefix]}]
   (str
@@ -203,6 +238,7 @@ form input[type='text'], form textarea {
   (html-view
    (:200 statuses)
    [:body
+    [:h1 (:title msgcat)]
     (entries-in-db db)
     (form script-name)]))
 
