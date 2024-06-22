@@ -84,6 +84,10 @@ dl, form div {
   margin-bottom: 1rem;
 }
 
+dd.message {
+  white-space: pre-line;
+}
+
 dt, input[type='submit'], label {
   font-weight: bold;
 }
@@ -294,6 +298,11 @@ input, textarea {
                   remote
                   (str current-timestamp)))
 
+(defn compress-newlines
+  "Removes more than two newlines in a row."
+  [s]
+  (joker.string/replace s #"[\r\n]{2,}" "\n\n"))
+
 (defn entry
   "Returns Hiccup markup for a guestbook entry."
   [{:strs [contact message name]}]
@@ -301,7 +310,7 @@ input, textarea {
    [:dt (msgcat :name)] [:dd name]
    (when-not (joker.string/blank? contact)
      (list [:dt (msgcat :contact)] [:dd contact]))
-   [:dt (msgcat :message)] [:dd message]])
+   [:dt (msgcat :message)] [:dd {:class :message} (compress-newlines message)]])
 
 (defn entries
   "Returns Hiccup markup for a sequence of guestbook entries."
