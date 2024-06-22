@@ -22,21 +22,27 @@
 ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ;; THE SOFTWARE.
 
-;; User-editable settings.
+;; User-editable settings begin here.
 
 ;; Set to `false` in production.
 (def debug true)
 
+;; If `false`, disables posting and replaces the form
+;; with a message it is disabled.
 (def allow-posting true)
 
-;; How long a captcha says valid, in seconds.
+;; How long a captcha stays valid, in seconds.
 (def captcha-expiry (* 10 60))
 
+;; Where to store all of the guestbook's information.
+;; This file will contain the HMAC secret key for captchas,
+;; so don't make it publicly readable.
 (def db-file "guestbook.bolt")
 
 ;; The minimum wait time in seconds for posting from the same remote address.
 (def min-wait (* 60 60))
 
+;; The page's stylesheet.
 (def css "
 *, *::before, *::after {
   box-sizing: border-box;
@@ -154,11 +160,14 @@ input, textarea {
 
 (def secret-key "secret")
 
-(defn msgcat [k & args]
+(defn msgcat
+  "Returns the message `k` from the message catalog formatted with `args`."
+  [k & args]
   (apply format (msgcat-messages k) args))
 
 (defn parse-query
-  "Parses the query part of a URI or a URL-encoded form."
+  "Parses the query part of a URI or a URL-encoded form.
+  Returns a map."
   [query]
   (as-> query x
     (joker.string/trim x)
@@ -171,8 +180,9 @@ input, textarea {
     (map joker.url/query-unescape x)
     (apply hash-map x)))
 
-(defn unix-now []
+(defn unix-now
   "Returns the unix timestamp in seconds."
+  []
   (->
    (joker.time/now)
    (joker.time/unix)))
@@ -188,9 +198,10 @@ input, textarea {
          (joker.strconv/parse-int 10 0))]
     (> min-wait (- current-timestamp last-timestamp))))
 
-(defn set-secret-if-nil [db]
+(defn set-secret-if-nil
   "Generates and sets a random HMAC secret key
-  if there is no secret in the database or it is `nil`."
+  if there is no secret key in the database or it is `nil`."
+  [db]
   (when (nil? (joker.bolt/get db (:captcha buckets) secret-key))
     (joker.bolt/put db (:captcha buckets) secret-key (joker.uuid/new))))
 
@@ -215,7 +226,8 @@ input, textarea {
 
 (defn challenge-solution?
   "Returns whether the proposed solution
-  solves a Lisp addition captcha challenge."
+  solves a Lisp addition captcha challenge.
+  Note that `solution` is a string"
   [challenge solution]
   (and (< (count solution) 10)
        (re-matches #"\(\+( -?\d+)+\)" challenge)
@@ -370,8 +382,8 @@ input, textarea {
 
 
 (defn cgi
-  "Process a CGI request with a given database, environment-variable
-  dictionary, and standard input."
+  "Processes a CGI request with a given database, environment-variable map,
+  and standard input."
   [db env input]
   (try
     (set-secret-if-nil db)
