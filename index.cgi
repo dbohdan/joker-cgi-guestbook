@@ -22,10 +22,18 @@
 ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ;; THE SOFTWARE.
 
+;; User-editable settings.
+
 ;; Set to `false` in production.
 (def debug true)
 
+(def allow-posting true)
+
+;; How long a captcha says valid, in seconds.
+(def captcha-expiry (* 10 60))
+
 (def db-file "guestbook.bolt")
+
 ;; The minimum wait time in seconds for posting from the same remote address.
 (def min-wait (* 60 60))
 
@@ -96,15 +104,16 @@ input, textarea {
 }
 ")
 
-(def buckets
-  {:entries "entries"
-   :rate-limit "rate-limit"})
-
-(def msgcat
+(def msgcat-strings
   {:name "Name:"
+   :captcha "Captcha:"
+   :captcha-info "Please solve the challenge <code>%s</code> to post."
+   :captcha-missing "Sorry, the captcha is required."
+   :captcha-wrong "Sorry, the captcha is expired, invalid, or wrong."
    :contact "Contact:"
    :contact-in-form "Contact information (will be public):"
    :message "Message:"
+   :posting-disabled "Posting is currently disabled."
    :rate-limited (str "Sorry, but your network address has "
                       "signed the guestbook recently.")
    :required-field-missing "Sorry, a name and a message are required."
@@ -113,11 +122,24 @@ input, textarea {
    :title "Guestbook"
    :unknown-error "Sorry, an unknown error has occurred."})
 
+;; End of user-editable settings.
+
+(def buckets
+  {:captcha "captcha"
+   :entries "entries"
+   :rate-limits "rate-limits"})
+
 (def statuses
   {:200 "200 OK"
    :422 "422 Unprocessable Entity"
    :429 "429 Too Many Requests"
-   :500 "500 Internal Server Error"})
+   :500 "500 Internal Server Error"
+   :503 "503 Service Unavailable"})
+
+(def secret-key "secret")
+
+(defn msgcat [k & args]
+  (apply format (msgcat-strings k) args))
 
 (defn parse-query
   "Parses the query part of a URI or a URL-encoded form."
@@ -134,24 +156,84 @@ input, textarea {
     (apply hash-map x)))
 
 (defn unix-now []
+  "Returns the unix timestamp in seconds."
   (->
    (joker.time/now)
    (joker.time/unix)))
 
-(defn rate-limited?
-  "Checks if a remote address is being rate-limited
-  as of the current timestap."
+(defn address-rate-limited?
+  "Returns `true` if the remote address is rate-limited
+  and should not be allowed to post as of the timestamp."
   [db remote current-timestamp]
   (let [last-timestamp
         (->
-         (joker.bolt/get db (:rate-limit buckets) remote)
+         (joker.bolt/get db (:rate-limits buckets) remote)
          (or "0")
          (joker.strconv/parse-int 10 0))]
     (> min-wait (- current-timestamp last-timestamp))))
 
+(defn set-secret-if-nil [db]
+  "Generates and sets a random HMAC secret key
+  if there is no secret in the database or it is `nil`."
+  (when (nil? (joker.bolt/get db (:captcha buckets) secret-key))
+    (joker.bolt/put db (:captcha buckets) secret-key (joker.uuid/new))))
+
+(defn sign
+  "Returns `message` signed using HMAC
+  with a secret key stored in the database."
+  [db message]
+  (let [secret (joker.bolt/get db (:captcha buckets) secret-key)]
+    (->
+     (joker.crypto/hmac :sha512 message secret)
+     (joker.hex/encode-string))))
+
+(defn new-challenge
+  "Returns a random captcha challenge that looks like `'(+ 1 -2 3)`."
+  []
+  (->>
+   (map
+    (fn [_] (- 5 (rand-int 10)))
+    (range (+ 2 (rand-int 4))))
+   (list* '+)
+   (str)))
+
+(defn challenge-solution?
+  "Returns whether the proposed solution
+  solves a Lisp addition captcha challenge."
+  [challenge solution]
+  (and (< (count solution) 10)
+       (re-matches #"\(\+( -?\d+)+\)" challenge)
+       (= (->>
+           challenge
+           (re-seq #"-?\d+")
+           (map (fn [x] (joker.strconv/parse-int x 10 0)))
+           (apply +)
+           (str))
+          (joker.string/trim solution))))
+
+(defn new-captcha
+  "Returns a signed stateless captcha."
+  [db current-timestamp]
+  (let [challenge (new-challenge)
+        challenge-blob (joker.json/write-string
+                        [current-timestamp challenge])]
+    {:challenge challenge
+     :challenge-blob challenge-blob
+     :signature (sign db challenge-blob)}))
+
+(defn captcha-solution?
+  "Returns `true` if `captcha` solves the signed stateless captcha
+  represented by `challenge-blob` and `signature`.
+  Returns `false` if the signature is invalid."
+  [db current-timestamp captcha challenge-blob signature]
+  (let [[captcha-timestamp challenge] (joker.json/read-string challenge-blob)]
+    (and (> captcha-expiry (- current-timestamp captcha-timestamp))
+         (= (sign db challenge-blob) signature)
+         (challenge-solution? challenge captcha))))
+
 (defn add-entry
-  "Adds an entry to the guestbook and rate-limiting table."
-  [db contact message name remote]
+  "Adds an entry to the guestbook and to the rate-limiting table."
+  [db current-timestamp remote {:strs [contact message name]}]
   (joker.bolt/put db
                   (:entries buckets)
                   (str (joker.bolt/next-sequence db (:entries buckets)))
@@ -161,23 +243,29 @@ input, textarea {
                     :name name
                     :remote remote}))
   (joker.bolt/put db
-                  (:rate-limit buckets)
+                  (:rate-limits buckets)
                   remote
-                  (str (unix-now))))
+                  (str current-timestamp)))
 
-(defn entry [{:strs [contact message name]}]
+(defn entry
+  "Returns Hiccup markup for a guestbook entry."
+  [{:strs [contact message name]}]
   [:dl
    [:dt (msgcat :name)] [:dd name]
    (when-not (joker.string/blank? contact)
      (list [:dt (msgcat :contact)] [:dd contact]))
    [:dt (msgcat :message)] [:dd message]])
 
-(defn entries [bucket-contents]
+(defn entries
+  "Returns Hiccup markup for a sequence of guestbook entries."
+  [bucket-contents]
   [:div
    (for [[_ json] bucket-contents]
      [:article (entry (joker.json/read-string json))])])
 
-(defn entries-in-db [db]
+(defn entries-in-db
+  "Returns Hiccup markup for all guestbook entries in a database."
+  [db]
   (->>
    (joker.bolt/by-prefix db (:entries buckets) "")
    (map (fn [[id json]]
@@ -185,11 +273,15 @@ input, textarea {
    (sort)
    (entries)))
 
-(defn form [action]
+(defn form
+  "Returns Hiccup markup for the guestbook submission form."
+  [action {:keys [challenge challenge-blob signature]}]
   [:form {:method :post
           :action action}
-   [:h2 (:sign msgcat)]
+   [:h2 (msgcat :sign)]
    [:div
+    [:input {:type :hidden :name :challenge :value challenge-blob}]
+    [:input {:type :hidden :name :signature :value signature}]
     [:div
      [:label {:for :name} (msgcat :name)]
      [:input {:type :text
@@ -205,10 +297,20 @@ input, textarea {
      [:textarea {:id :message
                  :name :message}]]
     [:div
+     [:div
+      (joker.hiccup/raw-string (msgcat :captcha-info challenge))]
+     [:label {:for :captcha} (msgcat :captcha)]
+     [:input {:type :text
+              :id :captcha
+              :name :captcha}]]
+    [:div
      [:input {:type :submit
-              :value (:send msgcat)}]]]])
+              :value (msgcat :send)}]]]])
 
-(defn html-view [status body & {:keys [title-prefix]}]
+(defn html-view
+  "Takes the Hiccup markup in `body` and returns a full HTML page
+  plus the headers for CGI as text."
+  [status body & {:keys [title-prefix]}]
   (str
    "Content-Type: text/html\r\n"
    "Status: " status "\r\n\r\n"
@@ -218,7 +320,8 @@ input, textarea {
     [:html {:lang "en"}
      [:head
       [:meta {:charset "utf-8"}]
-      [:meta {:name "viewport" :content "width=device-width, initial-scale=1.0, user-scalable=yes"}]
+      [:meta {:name "viewport"
+              :content "width=device-width, initial-scale=1.0, user-scalable=yes"}]
       [:title
        (str
         (if (joker.string/blank? title-prefix)
@@ -228,41 +331,74 @@ input, textarea {
       [:style (joker.hiccup/raw-string css)]]
      body])))
 
-(defn error-view [status message]
+(defn error-view
+  "Returns an HTML page with the given error message."
+  [status message]
   (html-view
    status
    [:body [:h1 message]]
    :title-prefix status))
 
-(defn normal-view [db script-name]
+(defn normal-view
+  "Returns an HTML page with the guestbook entries and optionally
+  the submission form."
+  [db script-name show-post-form captcha]
   (html-view
    (:200 statuses)
    [:body
-    [:h1 (:title msgcat)]
+    [:h1 (msgcat :title)]
     (entries-in-db db)
-    (form script-name)]))
+    (if show-post-form
+      (form script-name captcha)
+      [:h2 (msgcat :posting-disabled)])]))
+
 
 (defn cgi
   "Process a CGI request with a given database, environment-variable
   dictionary, and standard input."
   [db env input]
   (try
-    (let [query (parse-query input)
-          contact (get query "contact" "")
-          message (get query "message" "")
-          name (get query "name" "")
+    (set-secret-if-nil db)
+    (let [current-timestamp (unix-now)
+          page-captcha (new-captcha db current-timestamp)
+          query-without-defaults (parse-query input)
+          query (merge {"captcha" ""
+                        "challenge" ""
+                        "contact" ""
+                        "message" ""
+                        "name" ""
+                        "secret" ""}
+                       query-without-defaults)
           remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))
           script-name (get env "SCRIPT_NAME" "")]
       (if (= (get env "REQUEST_METHOD" "") "POST")
-        (if (rate-limited? db remote (unix-now))
+        (cond
+          (not allow-posting)
+          (error-view (:503 statuses) (msgcat :posting-disabled))
+
+          (address-rate-limited? db remote current-timestamp)
           (error-view (:429 statuses) (msgcat :rate-limited))
-          (if (or (joker.string/blank? name)
-                  (joker.string/blank? message))
-            (error-view (:422 statuses) (msgcat :required-field-missing))
-            (do
-              (add-entry db contact message name remote)
-              (normal-view db script-name))))
-        (normal-view db script-name)))
+
+          (or (joker.string/blank? (query "name"))
+              (joker.string/blank? (query "message")))
+          (error-view (:422 statuses) (msgcat :required-field-missing))
+
+          (joker.string/blank? (query "captcha"))
+          (error-view (:422 statuses) (msgcat :captcha-missing))
+
+          (not (captcha-solution?
+                db
+                current-timestamp
+                (query "captcha")
+                (query "challenge")
+                (query "signature")))
+          (error-view (:422 statuses) (msgcat :captcha-wrong))
+
+          :else
+          (do
+            (add-entry db current-timestamp remote query)
+            (normal-view db script-name allow-posting page-captcha)))
+        (normal-view db script-name allow-posting page-captcha)))
     (catch Error e
       (error-view (:500 statuses) (if debug e (msgcat :unknown-error))))))
 
