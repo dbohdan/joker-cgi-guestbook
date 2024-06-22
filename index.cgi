@@ -39,6 +39,12 @@
 ;; so don't make it publicly readable.
 (def db-file "guestbook.bolt")
 
+;; The longest a submitter's contact information, name, and message can be,
+;; in Unicode characters.
+(def max-length {"contact" 256
+                 "name" 64
+                 "message" 3072})
+
 ;; The minimum wait time in seconds for posting from the same remote address.
 (def min-wait (* 60 60))
 
@@ -141,6 +147,8 @@ input, textarea {
    "Sign the guestbook"
    :title
    "Guestbook"
+   :too-long
+   "Sorry, but the following fields are too long: %s."
    :unknown-error
    "Sorry, an unknown error has occurred."})
 
@@ -259,6 +267,17 @@ input, textarea {
          (= (sign db challenge-blob) signature)
          (challenge-solution? challenge captcha))))
 
+(defn check-counts
+  "Returns a sequence of keys that have greater `count` in `m`
+  than the limits in `reference`."
+  [m reference]
+  (mapcat
+   (fn [[k limit]]
+     (if (> (count (get m k "")) limit)
+       [k]
+       []))
+   (seq reference)))
+
 (defn add-entry
   "Adds an entry to the guestbook and to the rate-limiting table."
   [db current-timestamp remote {:strs [contact message name]}]
@@ -314,16 +333,22 @@ input, textarea {
      [:label {:for :name} (msgcat :name)]
      [:input {:type :text
               :id :name
-              :name :name}]]
+              :name :name
+              :maxlength (max-length "name")
+              :required true}]]
     [:div
      [:label {:for :contact} (msgcat :contact-in-form)]
      [:input {:type :text
               :id :contact
-              :name :contact}]]
+              :name :contact
+              :maxlength (max-length "contact")}]]
     [:div
      [:label {:for :message} (msgcat :message)]
      [:textarea {:id :message
-                 :name :message}]]
+                 :name :message
+                 :maxlength (max-length "message")
+                 :required true}]]
+
     [:div
      [:div
       (joker.hiccup/raw-string (msgcat :captcha-info challenge))]
@@ -397,6 +422,7 @@ input, textarea {
                         "name" ""
                         "secret" ""}
                        query-without-defaults)
+          too-long (check-counts query max-length)
           remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))
           script-name (get env "SCRIPT_NAME" "")]
       (if (= (get env "REQUEST_METHOD" "") "POST")
@@ -410,6 +436,9 @@ input, textarea {
           (or (joker.string/blank? (query "name"))
               (joker.string/blank? (query "message")))
           (error-view (:422 statuses) (msgcat :required-field-missing))
+
+          (not-empty too-long)
+          (error-view (:422 statuses) (msgcat :too-long (joker.string/join ", " too-long)))
 
           (joker.string/blank? (query "captcha"))
           (error-view (:422 statuses) (msgcat :captcha-missing))
