@@ -1,6 +1,6 @@
 #! /arpa/af/d/dbohdan/bin/joker
 ;; A toy old-school CGI guestbook written in Joker.
-;; Version 0.1.0.
+;; Version 0.1.1.
 ;; https://github.com/dbohdan/joker-cgi-guestbook
 ;;
 ;; Copyright (c) 2024 D. Bohdan
@@ -198,21 +198,6 @@ input, textarea {
   "Returns the message `k` from the message catalog formatted with `args`."
   [key & args]
   (apply format (msgcat-messages key) args))
-
-(defn parse-query
-  "Parses the query part of a URI or a URL-encoded form.
-  Returns a map."
-  [query]
-  (as-> query x
-    (joker.string/trim x)
-    (joker.string/split x "&")
-    (mapcat
-     (fn [pair]
-       (rest
-        (re-matches #"^([^=]*)=(.*)$" pair)))
-     x)
-    (map joker.url/query-unescape x)
-    (apply hash-map x)))
 
 (defn unix-now
   "Returns the unix timestamp in seconds."
@@ -462,14 +447,15 @@ input, textarea {
        (set-secret-if-nil db key)))
     (let [current-timestamp (unix-now)
           page-captcha (new-captcha db current-timestamp)
-          query-without-defaults (parse-query input)
+          query-strings (-> (joker.url/parse-query input)
+                            (update-vals (fn [strs] (joker.string/join strs))))
           query (merge {"captcha" ""
                         "challenge" ""
                         "contact" ""
                         "message" ""
                         "name" ""
                         "secret" ""}
-                       query-without-defaults)
+                       query-strings)
           too-long (check-counts query max-length)
           remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))
           script-name (get env "SCRIPT_NAME" "")]
