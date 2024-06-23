@@ -22,7 +22,7 @@ to browse and edit the database.
 
 ## Screenshot
 
-<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form" src="screenshot.png" width="320" height="569"></a>
+<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form" src="screenshot.png" width="320"></a>
 
 ## License
 
