@@ -76,6 +76,16 @@ article, form {
   padding: 0 1rem;
 }
 
+input[type='submit'] {
+  padding: 0 2.5rem;
+}
+
+div.submit {
+  display: flex;
+  justify-content: right;
+  margin-top: 1.15rem;
+}
+
 dl {
   margin-top: 1rem;
 }
@@ -145,10 +155,10 @@ input, textarea {
    "Sorry, but your network address has signed the guestbook recently."
    :required-field-missing
    "Sorry, a name and a message are required."
-   :send
-   "Send"
    :sign
    "Sign the guestbook"
+   :submit-button
+   "Sign"
    :title
    "Guestbook"
    :too-long
@@ -369,9 +379,9 @@ input, textarea {
               :id :captcha
               :name :captcha
               :autocomplete :off}]]
-    [:div
+    [:div {:class :submit}
      [:input {:type :submit
-              :value (msgcat :send)}]]]])
+              :value (msgcat :submit-button)}]]]])
 
 (defn html-view
   "Takes the Hiccup markup in `body` and returns a full HTML page
