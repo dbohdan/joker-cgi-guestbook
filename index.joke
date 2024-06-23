@@ -170,6 +170,7 @@ input, textarea {
    :500 "500 Internal Server Error"
    :503 "503 Service Unavailable"})
 
+(def hide-key "hide")
 (def secret-key "secret")
 
 (defn msgcat
@@ -316,16 +317,18 @@ input, textarea {
   "Returns Hiccup markup for a sequence of guestbook entries."
   [bucket-contents]
   [:div
-   (for [[_ json] bucket-contents]
-     [:article (entry (joker.json/read-string json))])])
+   (for [[_ entry-data] bucket-contents]
+     [:article (entry entry-data)])])
 
 (defn entries-in-db
   "Returns Hiccup markup for all guestbook entries in a database."
   [db]
   (->>
    (joker.bolt/by-prefix db (:entries buckets) "")
-   (map (fn [[id json]]
-          [(joker.strconv/parse-int id 10 0) json]))
+   (map (fn [[id json]] [(joker.strconv/parse-int id 10 0)
+                         (joker.json/read-string json)]))
+   (filter (fn [[_ entry-data]] (let [hide (get entry-data hide-key false)]
+                                  (or (not hide) (= hide 0)))))
    (sort)
    (entries)))
 
@@ -364,7 +367,8 @@ input, textarea {
      [:label {:for :captcha} (msgcat :captcha)]
      [:input {:type :text
               :id :captcha
-              :name :captcha}]]
+              :name :captcha
+              :autocomplete :off}]]
     [:div
      [:input {:type :submit
               :value (msgcat :send)}]]]])
