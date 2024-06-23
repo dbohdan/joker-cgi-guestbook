@@ -211,21 +211,6 @@ input, textarea {
   [key & args]
   (apply format (msgcat-messages key) args))
 
-(defn parse-query
-  "Parses the query part of a URI or a URL-encoded form.
-  Returns a map."
-  [query]
-  (as-> query x
-    (joker.string/trim x)
-    (joker.string/split x "&")
-    (mapcat
-     (fn [pair]
-       (rest
-        (re-matches #"^([^=]*)=(.*)$" pair)))
-     x)
-    (map joker.url/query-unescape x)
-    (apply hash-map x)))
-
 (defn unix-now
   "Returns the unix timestamp in seconds."
   []
@@ -478,7 +463,9 @@ input, textarea {
              remote
              script-name]}]
   (let [input (joker.io/read input-stream content-length)
-        query-without-defaults (parse-query input)
+        query-without-defaults (-> (joker.url/parse-query input)
+                                   (update-vals
+                                    (fn [strs] (joker.string/join strs))))
         query (merge query-defaults query-without-defaults)
         too-long (check-counts query max-length)]
     (cond
