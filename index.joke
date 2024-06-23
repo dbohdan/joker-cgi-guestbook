@@ -1,6 +1,7 @@
 #! /arpa/af/d/dbohdan/bin/joker
-;; An old-school CGI guestbook written in Joker.
+;; A toy old-school CGI guestbook written in Joker.
 ;; Version 0.1.0.
+;; https://github.com/dbohdan/joker-cgi-guestbook
 ;;
 ;; Copyright (c) 2024 D. Bohdan
 ;;
