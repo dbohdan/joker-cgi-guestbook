@@ -148,6 +148,8 @@ input, textarea {
    "Contact:"
    :contact-in-form
    "Contact information (will be public):"
+   :entry-id
+   "entry-%s"
    :message
    "Message:"
    :posting-disabled
@@ -170,7 +172,7 @@ input, textarea {
 ;; End of user-editable settings.
 
 (def buckets
-  {:captcha "captcha"
+  {:config "config"
    :entries "entries"
    :rate-limits "rate-limits"})
 
@@ -182,7 +184,8 @@ input, textarea {
    :503 "503 Service Unavailable"})
 
 (def hide-key "hide")
-(def secret-key "secret")
+(def secret-keys {:captcha "captcha-secret"
+                  :id "id-secret"})
 
 (defn msgcat
   "Returns the message `k` from the message catalog formatted with `args`."
@@ -225,18 +228,23 @@ input, textarea {
 (defn set-secret-if-nil
   "Generates and sets a random HMAC secret key
   if there is no secret key in the database or it is `nil`."
-  [db]
-  (when (nil? (joker.bolt/get db (:captcha buckets) secret-key))
-    (joker.bolt/put db (:captcha buckets) secret-key (joker.uuid/new))))
+  [db key]
+  (when (nil? (joker.bolt/get db (:config buckets) key))
+    (joker.bolt/put db (:config buckets) key (joker.uuid/new))))
+
+(defn hex-hmac
+  "Return HMAC-SHA-512 in hex as a string."
+  [message key]
+  (->
+   (joker.crypto/hmac :sha512 message key)
+   (joker.hex/encode-string)))
 
 (defn sign
   "Returns `message` signed using HMAC
   with a secret key stored in the database."
   [db message]
-  (let [secret (joker.bolt/get db (:captcha buckets) secret-key)]
-    (->
-     (joker.crypto/hmac :sha512 message secret)
-     (joker.hex/encode-string))))
+  (let [secret (joker.bolt/get db (:config buckets) (:captcha secret-keys))]
+    (hex-hmac message secret)))
 
 (defn new-challenge
   "Returns a random captcha challenge that looks like `'(+ 1 -2 3)`."
@@ -324,12 +332,19 @@ input, textarea {
      (list [:dt (msgcat :contact)] [:dd contact]))
    [:dt (msgcat :message)] [:dd {:class :message} (compress-newlines message)]])
 
+(defn permute-id
+  "Make a linear numeric id not linear.
+  Returns a hex string."
+  [id-secret id]
+  (subs (hex-hmac (str id) id-secret) 0 6))
+
 (defn entries
   "Returns Hiccup markup for a sequence of guestbook entries."
-  [bucket-contents]
+  [id-secret bucket-contents]
   [:div
-   (for [[_ entry-data] bucket-contents]
-     [:article (entry entry-data)])])
+   (for [[id entry-data] bucket-contents]
+     [:article {:id (msgcat :entry-id (permute-id id-secret id))}
+      (entry entry-data)])])
 
 (defn entries-in-db
   "Returns Hiccup markup for all guestbook entries in a database."
@@ -341,7 +356,7 @@ input, textarea {
    (filter (fn [[_ entry-data]] (let [hide (get entry-data hide-key false)]
                                   (or (not hide) (= hide 0)))))
    (sort)
-   (entries)))
+   (entries (joker.bolt/get db (:config buckets) (:id secret-keys)))))
 
 (defn form
   "Returns Hiccup markup for the guestbook submission form."
@@ -435,7 +450,9 @@ input, textarea {
   and standard input."
   [db env input]
   (try
-    (set-secret-if-nil db)
+    (dorun
+     (for [key (vals secret-keys)]
+       (set-secret-if-nil db key)))
     (let [current-timestamp (unix-now)
           page-captcha (new-captcha db current-timestamp)
           query-without-defaults (parse-query input)
