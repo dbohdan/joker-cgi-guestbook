@@ -189,8 +189,8 @@ input, textarea {
 
 (defn msgcat
   "Returns the message `k` from the message catalog formatted with `args`."
-  [k & args]
-  (apply format (msgcat-messages k) args))
+  [key & args]
+  (apply format (msgcat-messages key) args))
 
 (defn parse-query
   "Parses the query part of a URI or a URL-encoded form.
@@ -296,9 +296,9 @@ input, textarea {
   than the limits in `reference`."
   [m reference]
   (mapcat
-   (fn [[k limit]]
-     (if (> (count (get m k "")) limit)
-       [k]
+   (fn [[key limit]]
+     (if (> (count (get m key "")) limit)
+       [key]
        []))
    (seq reference)))
 
