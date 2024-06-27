@@ -17,8 +17,18 @@ to verify the solved challenge is authentic and recent.
 The secret key for HMAC is generated automatically and stored in the database.
 This is a reason to forbid public access to it.
 
+There is no management interface.
 Use [boltbrowser](https://github.com/br0xen/boltbrowser)
 to browse and edit the database.
+To hide an entry without deleting it:
+
+1. Find the entry in the Bolt bucket `entries`.
+2. Edit the JSON object to add a key `hide` with the value `true`.
+
+This project is a toy.
+I don't know how actively I am going to maintain it.
+Expect less testing, feature development, and support
+than from a regular project.
 
 ## Screenshot
 
