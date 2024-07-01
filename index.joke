@@ -64,6 +64,7 @@ body {
   background-color: #eed3d3;
   font-family: serif;
   font-size: 16px;
+  line-height: 1.2rem;
   margin-top: 0;
   margin-bottom: 1rem;
   max-width: 35rem;
@@ -75,16 +76,6 @@ article, form {
   border-radius: 12px;
   margin: 1rem 0;
   padding: 0 1rem;
-}
-
-input[type='submit'] {
-  padding: 0 2.5rem;
-}
-
-div.submit {
-  display: flex;
-  justify-content: right;
-  margin-top: 1.15rem;
 }
 
 dl {
@@ -108,12 +99,28 @@ form {
   flex-direction: column;
 }
 
+form code {
+  display: block;
+  margin-top: 0.3rem;
+  white-space: nowrap;
+}
+
+form div.submit {
+  display: flex;
+  justify-content: right;
+  margin-top: 1.15rem;
+}
+
 form div div {
   margin: 0.5rem 0;
 }
 
 form h2 {
   margin-bottom: 0.65rem;
+}
+
+form input[type='submit'] {
+  padding: 0 2.5rem;
 }
 
 form input[type='text'], form textarea {
@@ -134,23 +141,23 @@ input, textarea {
 ;; All of the guestbook's messages.
 ;; You can change them to customize and localize the guestbook.
 (def msgcat-messages
-  {:name
+  {:name-label
    "Name:"
-   :captcha
-   "Captcha:"
+   :captcha-label
+   "Solution:"
    :captcha-info
-   "Please solve the challenge <code>%s</code> to sign the guestbook."
+   "Please solve the challenge to sign the guestbook: <code>%s</code>"
    :captcha-missing
    "Sorry, but to sign the guestbook you must solve the captcha challenge."
    :captcha-wrong
    "Sorry, either the solution is wrong, or your captcha is expired or invalid."
-   :contact
+   :contact-label
    "Contact:"
-   :contact-in-form
+   :contact-label-long
    "Contact information (will be public):"
    :entry-id
    "entry-%s"
-   :message
+   :message-label
    "Message:"
    :posting-disabled
    "Posting is currently disabled."
@@ -252,7 +259,7 @@ input, textarea {
   (->>
    (map
     (fn [_] (- 5 (rand-int 10)))
-    (range (+ 2 (rand-int 4))))
+    (range (+ 2 (rand-int 3))))
    (list* '+)
    (str)))
 
@@ -327,10 +334,10 @@ input, textarea {
   "Returns Hiccup markup for a guestbook entry."
   [{:strs [contact message name]}]
   [:dl
-   [:dt (msgcat :name)] [:dd name]
+   [:dt (msgcat :name-label)] [:dd name]
    (when-not (joker.string/blank? contact)
-     (list [:dt (msgcat :contact)] [:dd contact]))
-   [:dt (msgcat :message)] [:dd {:class :message} (compress-newlines message)]])
+     (list [:dt (msgcat :contact-label)] [:dd contact]))
+   [:dt (msgcat :message-label)] [:dd {:class :message} (compress-newlines message)]])
 
 (defn permute-id
   "Make a linear numeric id not linear.
@@ -368,20 +375,20 @@ input, textarea {
     [:input {:type :hidden :name :challenge :value challenge-blob}]
     [:input {:type :hidden :name :signature :value signature}]
     [:div
-     [:label {:for :name} (msgcat :name)]
+     [:label {:for :name} (msgcat :name-label)]
      [:input {:type :text
               :id :name
               :name :name
               :maxlength (max-length "name")
               :required true}]]
     [:div
-     [:label {:for :contact} (msgcat :contact-in-form)]
+     [:label {:for :contact} (msgcat :contact-label-long)]
      [:input {:type :text
               :id :contact
               :name :contact
               :maxlength (max-length "contact")}]]
     [:div
-     [:label {:for :message} (msgcat :message)]
+     [:label {:for :message} (msgcat :message-label)]
      [:textarea {:id :message
                  :name :message
                  :maxlength (max-length "message")
@@ -390,7 +397,7 @@ input, textarea {
     [:div
      [:div
       (joker.hiccup/raw-string (msgcat :captcha-info challenge))]
-     [:label {:for :captcha} (msgcat :captcha)]
+     [:label {:for :captcha} (msgcat :captcha-label)]
      [:input {:type :text
               :id :captcha
               :name :captcha
