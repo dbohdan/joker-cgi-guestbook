@@ -2,7 +2,7 @@
   (:require [joker.test :refer [deftest is run-tests]]))
 
 (def joker-executable (joker.os/executable))
-(def guestbook-file "index.joke")
+(def guestbook-file "guestbook.joke")
 
 (defn guestbook
   [& {:keys [stdin]}]
