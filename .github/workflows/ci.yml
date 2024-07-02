@@ -1,0 +1,14 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Joker
+        run: |
+          wget -O joker.zip https://github.com/candid82/joker/releases/download/v1.3.5/joker-linux-amd64.zip
+          unzip joker.zip
+      - name: Test
+        run: |
+          ./joker tests.joke
