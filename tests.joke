@@ -1,0 +1,33 @@
+(ns joker-cgi-guestbook.test
+  (:require [joker.test :refer [deftest is run-tests]]))
+
+(def joker-executable (joker.os/executable))
+(def guestbook-file "index.joke")
+
+(defn guestbook
+  [& {:keys [stdin]}]
+  (joker.os/exec joker-executable {:args [guestbook-file]
+                                   :stdin stdin}))
+
+(deftest front-page
+  (joker.os/set-env "REQUEST_METHOD" "GET")
+  (let [res (guestbook)]
+    (is (zero? (:exit res)))
+    (is (re-find #"Guestbook" (:out res)))))
+
+(deftest post-no-name
+  (joker.os/set-env "CONTENT_LENGTH" "0")
+  (joker.os/set-env "REQUEST_METHOD" "POST")
+  (let [res (guestbook)]
+    (is (zero? (:exit res)))
+    (is (re-find #"a name and a message are required" (:out res)))))
+
+(deftest post-no-captcha
+  (joker.os/set-env "REQUEST_METHOD" "POST")
+  (let [query "name=foo&message=bar"]
+    (joker.os/set-env "CONTENT_LENGTH" (str (count query)))
+    (let [res (guestbook :stdin query)]
+      (is (zero? (:exit res)))
+      (is (re-find #"you must solve the challenge" (:out res))))))
+
+(run-tests)
