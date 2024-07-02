@@ -1,0 +1,2 @@
+test:
+  joker tests.joke
