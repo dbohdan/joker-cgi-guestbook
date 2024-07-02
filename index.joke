@@ -148,9 +148,9 @@ input, textarea {
    :captcha-info
    "Please solve the challenge to sign the guestbook: <code>%s</code>"
    :captcha-missing
-   "Sorry, but to sign the guestbook you must solve the captcha challenge."
+   "Sorry, but to sign the guestbook you must solve the challenge."
    :captcha-wrong
-   "Sorry, either the solution is wrong, or your captcha is expired or invalid."
+   "Sorry, either the solution is wrong, or your challenge is expired or invalid."
    :contact-label
    "Contact:"
    :contact-label-long
