@@ -183,6 +183,14 @@ input, textarea {
    :entries "entries"
    :rate-limits "rate-limits"})
 
+(def query-defaults
+  {"captcha" ""
+   "challenge" ""
+   "contact" ""
+   "message" ""
+   "name" ""
+   "secret" ""})
+
 (def statuses
   {:200 "200 OK"
    :422 "422 Unprocessable Entity"
@@ -451,58 +459,73 @@ input, textarea {
       (form script-name captcha)
       [:h2 (msgcat :posting-disabled)])]))
 
+(defn handle-post
+  "Process a POST request.
+  Returns a response to it."
+  [& {:keys [content-length
+             current-timestamp
+             db
+             input-stream
+             page-captcha
+             remote
+             script-name]}]
+  (let [input (if (zero? content-length) "" (slurp input-stream))
+        query-without-defaults (parse-query input)
+        query (merge query-defaults query-without-defaults)
+        too-long (check-counts query max-length)]
+    (cond
+      (not allow-posting)
+      (error-view (:503 statuses) (msgcat :posting-disabled))
+
+      (address-rate-limited? db remote current-timestamp)
+      (error-view (:429 statuses) (msgcat :rate-limited))
+
+      (or (joker.string/blank? (query "name"))
+          (joker.string/blank? (query "message")))
+      (error-view (:422 statuses) (msgcat :required-field-missing))
+
+      (not-empty too-long)
+      (error-view (:422 statuses) (msgcat :too-long (joker.string/join ", " too-long)))
+
+      (joker.string/blank? (query "captcha"))
+      (error-view (:422 statuses) (msgcat :captcha-missing))
+
+      (not (captcha-solution?
+            db
+            current-timestamp
+            (query "captcha")
+            (query "challenge")
+            (query "signature")))
+      (error-view (:422 statuses) (msgcat :captcha-wrong))
+
+      :else
+      (do
+        (add-entry db current-timestamp remote query)
+        (normal-view db script-name allow-posting page-captcha)))))
 
 (defn cgi
   "Processes a CGI request with a given database, environment-variable map,
   and standard input."
-  [db env input]
+  [db env input-stream]
   (try
     (dorun
      (for [key (vals secret-keys)]
        (set-secret-if-nil db key)))
-    (let [current-timestamp (unix-now)
+    (let [content-length (try
+                           (joker.strconv/parse-int (get env "CONTENT_LENGTH" "0") 10 0)
+                           (catch Error _ 0))
+          current-timestamp (unix-now)
           page-captcha (new-captcha db current-timestamp)
-          query-without-defaults (parse-query input)
-          query (merge {"captcha" ""
-                        "challenge" ""
-                        "contact" ""
-                        "message" ""
-                        "name" ""
-                        "secret" ""}
-                       query-without-defaults)
-          too-long (check-counts query max-length)
           remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))
           script-name (get env "SCRIPT_NAME" "")]
       (if (= (get env "REQUEST_METHOD" "") "POST")
-        (cond
-          (not allow-posting)
-          (error-view (:503 statuses) (msgcat :posting-disabled))
-
-          (address-rate-limited? db remote current-timestamp)
-          (error-view (:429 statuses) (msgcat :rate-limited))
-
-          (or (joker.string/blank? (query "name"))
-              (joker.string/blank? (query "message")))
-          (error-view (:422 statuses) (msgcat :required-field-missing))
-
-          (not-empty too-long)
-          (error-view (:422 statuses) (msgcat :too-long (joker.string/join ", " too-long)))
-
-          (joker.string/blank? (query "captcha"))
-          (error-view (:422 statuses) (msgcat :captcha-missing))
-
-          (not (captcha-solution?
-                db
-                current-timestamp
-                (query "captcha")
-                (query "challenge")
-                (query "signature")))
-          (error-view (:422 statuses) (msgcat :captcha-wrong))
-
-          :else
-          (do
-            (add-entry db current-timestamp remote query)
-            (normal-view db script-name allow-posting page-captcha)))
+        (handle-post :content-length content-length
+                     :current-timestamp current-timestamp
+                     :db db
+                     :input-stream input-stream
+                     :page-captcha page-captcha
+                     :remote remote
+                     :script-name script-name)
         (normal-view db script-name allow-posting page-captcha)))
     (catch Error e
       (error-view (:500 statuses) (if debug e (msgcat :unknown-error))))))
@@ -515,5 +538,5 @@ input, textarea {
    (cgi
     db
     (joker.os/env)
-    (slurp *in*)))
+    *in*))
   (joker.bolt/close db))
