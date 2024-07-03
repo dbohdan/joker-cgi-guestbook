@@ -469,7 +469,7 @@ input, textarea {
              page-captcha
              remote
              script-name]}]
-  (let [input (if (zero? content-length) "" (slurp input-stream))
+  (let [input (joker.io/read input-stream content-length)
         query-without-defaults (parse-query input)
         query (merge query-defaults query-without-defaults)
         too-long (check-counts query max-length)]
