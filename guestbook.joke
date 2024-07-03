@@ -141,9 +141,7 @@ input, textarea {
 ;; All of the guestbook's messages.
 ;; You can change them to customize and localize the guestbook.
 (def msgcat-messages
-  {:name-label
-   "Name:"
-   :captcha-label
+  {:captcha-label
    "Solution:"
    :captcha-info
    "Please solve the challenge to sign the guestbook: <code>%s</code>"
@@ -159,6 +157,8 @@ input, textarea {
    "entry-%s"
    :message-label
    "Message:"
+   :name-label
+   "Name:"
    :posting-disabled
    "Posting is currently disabled."
    :rate-limited
