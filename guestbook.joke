@@ -40,6 +40,10 @@
 ;; so don't make it publicly readable.
 (def db-file "guestbook.bolt")
 
+;; The inner HTML of a `<header>` tag shown above the entries.
+;; Leave empty to disable.
+(def header "<p><a href='/'>Up</a>.</p>")
+
 ;; The longest a submitter's contact information, name, and message can be,
 ;; in Unicode characters.
 (def max-length {"contact" 256
@@ -456,6 +460,8 @@ input, textarea {
    (:200 statuses)
    [:body
     [:h1 (msgcat :title)]
+    (when-not (joker.string/blank? header)
+      [:header (joker.hiccup/raw-string header)])
     (entries-in-db db)
     (if show-post-form
       (form script-name captcha)
