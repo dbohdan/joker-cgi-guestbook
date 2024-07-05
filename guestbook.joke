@@ -70,7 +70,7 @@ body {
   max-width: 35rem;
 }
 
-article, form {
+.box {
   background-color: white;
   border: solid 0.15rem;
   border-radius: 12px;
@@ -78,11 +78,11 @@ article, form {
   padding: 0 1rem;
 }
 
-dl {
+.box > *:first-child {
   margin-top: 1rem;
 }
 
-dl, form div {
+.box > *:last-child, form div {
   margin-bottom: 1rem;
 }
 
@@ -358,7 +358,8 @@ input, textarea {
   [id-secret bucket-contents]
   [:div
    (for [[id entry-data] bucket-contents]
-     [:article {:id (msgcat :entry-id (permute-id id-secret id))}
+     [:article {:class :box
+                :id (msgcat :entry-id (permute-id id-secret id))}
       (entry entry-data)])])
 
 (defn entries-in-db
@@ -376,7 +377,8 @@ input, textarea {
 (defn form
   "Returns Hiccup markup for the guestbook submission form."
   [action {:keys [challenge challenge-blob signature]}]
-  [:form {:method :post
+  [:form {:class :box
+          :method :post
           :action action}
    [:h2 (msgcat :sign)]
    [:div
