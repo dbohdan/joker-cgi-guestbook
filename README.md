@@ -8,7 +8,8 @@ for use on the [SDF Public Access UNIX System](https://sdf.org).
 
 ## Description
 
-The guestbook is a self-contained CGI script with no dependencies.
+The guestbook is a self-contained CGI script with no dependencies
+except Joker 1.4.0 or later.
 Like old CGI scripts, it has editable configuration at the top.
 Data is stored in a [Bolt](https://github.com/etcd-io/bbolt) database,
 which Joker has built in.
