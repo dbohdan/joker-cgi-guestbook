@@ -35,6 +35,43 @@ than from a regular project.
 
 <a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form" src="screenshot.png" width="320"></a>
 
+## Setup
+
+You will need an HTTP server with CGI enabled, like
+[Apache](https://httpd.apache.org/docs/2.4/howto/cgi.html)
+or
+[Caddy](https://github.com/aksdb/caddy-cgi).
+
+1. Download or build a Joker binary.
+   Binaries for Free/Net/OpenBSD, Linux, Mac, and Windows
+   are attached to Joker
+   [releases](https://github.com/candid82/joker/releases).
+   Install the binary on your server.
+   On a public Unix system like SDF,
+   you may be able to install the binary in your home directory
+   and use it for CGI.
+
+2. Download the source code file of the guestbook, `guestbook.joke`.
+   You can and should clone the repository to track your customizations in Git.
+   Edit the file.
+   Update the
+   [shebang line](https://en.wikipedia.org/wiki/Shebang_%28Unix%29)
+   to the absolute path to your Joker interpreter.
+   Update the settings as desired.
+
+3. Create a directory like `/guestbook/` in your server's CGI root.
+   Copy your customized `guestbook.joke` to the directory
+   with a filename the server will recognize
+   as a directory-index CGI script, like `index.cgi`.
+
+4. Access the guestbook on your server
+   (for example, <http://localhost/guestbook/>)
+   and confirm that it works.
+
+5. Make sure web clients cannot access the database file
+   (for example, <http://localhost/guestbook/guestbook.bolt>
+   with the default filename `guestbook.bolt`).
+
 ## License
 
 MIT.
