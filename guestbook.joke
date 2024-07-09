@@ -40,7 +40,14 @@
 ;; so don't make it publicly readable.
 (def db-file "guestbook.bolt")
 
-;; The inner HTML of a `<header>` tag shown above the entries.
+;; The inner HTML of a `<footer>` tag at the bottom of the page.
+;; Leave empty to disable.
+(def footer
+  (format
+   "<p>Powered by <a href='%s'>Joker CGI Guestbook</a></p>"
+   "https://github.com/dbohdan/joker-cgi-guestbook"))
+
+;; The inner HTML of a `<header>` tag above the entries.
 ;; Leave empty to disable.
 (def header "<p><a href='/'>Up</a>.</p>")
 
@@ -96,6 +103,11 @@ dd.message {
 
 dt, input[type='submit'], label {
   font-weight: bold;
+}
+
+footer {
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 form {
@@ -450,7 +462,9 @@ input, textarea {
     (entries-in-db db)
     (if show-post-form
       (form script-name captcha)
-      [:h2 (msgcat :posting-disabled)])]))
+      [:h2 (msgcat :posting-disabled)])
+    (when-not (joker.string/blank? footer)
+      [:footer (joker.hiccup/raw-string footer)])]))
 
 (defn handle-post
   "Process a POST request.
