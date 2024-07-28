@@ -109,6 +109,10 @@ dd.message {
   white-space: pre-line;
 }
 
+dt:not(:first-child) {
+  margin-top: 0.3rem;
+}
+
 dt, input[type='submit'], label {
   font-weight: bold;
 }
