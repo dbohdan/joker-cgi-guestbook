@@ -1,6 +1,6 @@
 #! /arpa/af/d/dbohdan/bin/joker
 ;; A toy old-school CGI guestbook written in Joker.
-;; Version 0.2.0.
+;; Version 0.3.0.
 ;; https://github.com/dbohdan/joker-cgi-guestbook
 ;;
 ;; Copyright (c) 2024 D. Bohdan
@@ -59,6 +59,14 @@
 
 ;; The minimum wait time in seconds for posting from the same remote address.
 (def min-wait (* 60 60))
+
+;; How to format the timestamp of an entry.
+;; Follows https://candid82.github.io/joker/joker.time.html#format
+(def timestamp-format "2006-01-02 15:04 UTC")
+
+;; In what time zone to format timestamps.
+;; Must be a valid location according to https://pkg.go.dev/time#LoadLocation
+(def timestamp-timezone "UTC")
 
 ;; The page's stylesheet.
 (def css "
@@ -169,6 +177,8 @@ input, textarea {
    "Contact:"
    :contact-label-long
    "Contact information (will be public):"
+   :date-posted
+   "Posted:"
    :entry-id
    "entry-%s"
    :message-label
@@ -328,7 +338,8 @@ input, textarea {
                    {:contact contact
                     :message message
                     :name name
-                    :remote remote}))
+                    :remote remote
+                    :timestamp current-timestamp}))
   (joker.bolt/put db
                   (:rate-limits buckets)
                   remote
@@ -339,14 +350,28 @@ input, textarea {
   [s]
   (joker.string/replace s #"[\r\n]{2,}" "\n\n"))
 
+(defn format-timestamp
+  "Returns the timestamp formatted for display according to configuration."
+  [timestamp]
+  (-> timestamp
+      (joker.time/from-unix 0)
+      (joker.time/in-timezone timestamp-timezone)
+      (joker.time/format timestamp-format)))
+
 (defn entry
   "Returns Hiccup markup for a guestbook entry."
-  [{:strs [contact message name]}]
+  [{:strs [contact message name timestamp]}]
   [:dl
-   [:dt (msgcat :name-label)] [:dd name]
+   [:dt (msgcat :name-label)]
+   [:dd name]
    (when-not (joker.string/blank? contact)
-     (list [:dt (msgcat :contact-label)] [:dd contact]))
-   [:dt (msgcat :message-label)] [:dd {:class :message} (compress-newlines message)]])
+     (list [:dt (msgcat :contact-label)]
+           [:dd contact]))
+   (when-not (nil? timestamp)
+     (list [:dt (msgcat :date-posted)]
+           [:dd (format-timestamp timestamp)]))
+   [:dt (msgcat :message-label)]
+   [:dd {:class :message} (compress-newlines message)]])
 
 (defn permute-id
   "Make a linear numeric id not linear.
