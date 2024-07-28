@@ -25,12 +25,17 @@
 
 ;; User-editable settings begin here.
 
-;; Set to `false` in production.
-(def debug true)
-
-;; If `false`, disables posting and replaces the form
-;; with a message it is disabled.
+;; If false, disables posting and replaces the form
+;; with a message that posting is disabled.
 (def allow-posting true)
+
+;; Set this to `false` to hide the backtrace (the details of the error)
+;; when a server error occurs.
+;; Backtraces provide information that helps debug errors.
+;; They can reveal information about the code and the server,
+;; like source-code file paths,
+;; but in this guestbook they should not contain sensitive information.
+(def backtrace true)
 
 ;; How long a captcha stays valid, in seconds.
 (def captcha-expiry (* 10 60))
@@ -83,7 +88,7 @@ body {
   background-color: #eed3d3;
   font-family: serif;
   font-size: 16px;
-  line-height: 1.2rem;
+  line-height: 1.2;
   margin-top: 0;
   margin-bottom: 1rem;
   max-width: 35rem;
@@ -164,6 +169,11 @@ input, textarea {
   border: solid 1px;
   font: inherit;
 }
+
+p.error {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
 ")
 
 ;; All of the guestbook's messages.
@@ -174,7 +184,7 @@ input, textarea {
    :captcha-info
    "Please solve the challenge to sign the guestbook: <code>%s</code>"
    :captcha-missing
-   "Sorry, but to sign the guestbook you must solve the challenge."
+   "Sorry, to sign the guestbook, you must solve the challenge."
    :captcha-wrong
    "Sorry, either the solution is wrong, or your challenge is expired or invalid."
    :contact-label
@@ -185,6 +195,10 @@ input, textarea {
    "Posted:"
    :entry-id
    "entry-%s"
+   :error-heading-server
+   "Server error"
+   :error-heading-submit
+   "Couldn't sign"
    :message-label
    "Message:"
    :name-label
@@ -202,9 +216,9 @@ input, textarea {
    :title
    "Guestbook"
    :too-long
-   "Sorry, but the following fields are too long: %s."
+   "Sorry, the following fields are too long: %s."
    :unknown-error
-   "Sorry, an unknown error has occurred."})
+   "Sorry, an unexpected error has occurred."})
 
 ;; End of user-editable settings.
 
@@ -472,10 +486,12 @@ input, textarea {
 
 (defn error-view
   "Returns an HTML page with the given error message."
-  [status message]
+  [status heading message]
   (html-view
    status
-   [:body [:h1 message]]
+   [:body
+    [:h1 heading]
+    [:p {:class :error} message]]
    :title-prefix status))
 
 (defn normal-view
@@ -513,20 +529,35 @@ input, textarea {
         too-long (check-counts query max-length)]
     (cond
       (not allow-posting)
-      (error-view (:503 statuses) (msgcat :posting-disabled))
+      (error-view
+       (:503 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :posting-disabled))
 
       (address-rate-limited? db remote current-timestamp)
-      (error-view (:429 statuses) (msgcat :rate-limited))
+      (error-view
+       (:429 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :rate-limited))
 
       (or (joker.string/blank? (query "name"))
           (joker.string/blank? (query "message")))
-      (error-view (:422 statuses) (msgcat :required-field-missing))
+      (error-view
+       (:422 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :required-field-missing))
 
       (not-empty too-long)
-      (error-view (:422 statuses) (msgcat :too-long (joker.string/join ", " too-long)))
+      (error-view
+       (:422 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :too-long (joker.string/join ", " too-long)))
 
       (joker.string/blank? (query "captcha"))
-      (error-view (:422 statuses) (msgcat :captcha-missing))
+      (error-view
+       (:422 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :captcha-missing))
 
       (not (captcha-solution?
             db
@@ -534,7 +565,10 @@ input, textarea {
             (query "captcha")
             (query "challenge")
             (query "signature")))
-      (error-view (:422 statuses) (msgcat :captcha-wrong))
+      (error-view
+       (:422 statuses)
+       (msgcat :error-heading-submit)
+       (msgcat :captcha-wrong))
 
       :else
       (do
@@ -566,7 +600,10 @@ input, textarea {
                      :script-name script-name)
         (normal-view db script-name allow-posting page-captcha)))
     (catch Error e
-      (error-view (:500 statuses) (if debug e (msgcat :unknown-error))))))
+      (error-view
+       (:500 statuses)
+       (msgcat :error-heading-server)
+       (if backtrace e (msgcat :unknown-error))))))
 
 (let [db (joker.bolt/open db-file 0600)]
   (dorun
