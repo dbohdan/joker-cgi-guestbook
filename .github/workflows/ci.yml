@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download Joker
         run: |
-          wget -O joker.zip https://github.com/candid82/joker/releases/download/v1.3.5/joker-linux-amd64.zip
+          wget -O joker.zip https://github.com/candid82/joker/releases/download/v1.4.0/joker-linux-amd64.zip
           unzip joker.zip
       - name: Test
         run: |
