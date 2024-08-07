@@ -54,7 +54,7 @@
 
 ;; The inner HTML of a `<header>` tag above the entries.
 ;; Leave empty to disable.
-(def header "<p><a href='/'>Up</a>.</p>")
+(def header "<p><a href='/'>Home</a>.</p>")
 
 ;; The longest a submitter's contact information, name, and message can be,
 ;; in Unicode characters.
