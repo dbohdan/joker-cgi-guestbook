@@ -33,7 +33,7 @@ than from a regular project.
 
 ## Screenshot
 
-<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form" src="screenshot.png" width="320"></a>
+<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form." src="screenshot.png" width="320"></a>
 
 ## Setup
 
@@ -71,6 +71,23 @@ or
 5. Make sure web clients cannot access the database file
    (for example, <http://localhost/guestbook/guestbook.bolt>
    with the default filename `guestbook.bolt`).
+
+## Theme
+
+The guestbook's style is defined in the variables `css` and `css-dark`
+in the script and can be customized.
+
+The guestbook supports dark mode.
+By default, it follows the system's color scheme preference
+(using the [`prefers-color-scheme`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-color-scheme) media query).
+You can override this by passing a `theme` query parameter:
+
+- `?theme=light`: force light mode.
+- `?theme=dark`: force dark mode.
+- `?theme=reverse`: use the opposite of the system's preference(‽).
+- Any other value: use the system's preference.
+
+Example: <http://localhost/guestbook/?theme=dark>
 
 ## License
 

@@ -1,9 +1,9 @@
 #! /arpa/af/d/dbohdan/bin/joker
 ;; A toy old-school CGI guestbook written in Joker.
-;; Version 0.3.0.
+;; Version 0.4.0.
 ;; https://github.com/dbohdan/joker-cgi-guestbook
 ;;
-;; Copyright (c) 2024 D. Bohdan
+;; Copyright (c) 2024-2025 D. Bohdan
 ;;
 ;; Permission is hereby granted, free of charge, to any person obtaining a copy
 ;; of this software and associated documentation files (the "Software"), to deal
@@ -173,6 +173,30 @@ input, textarea {
 p.error {
   font-size: 1.5rem;
   font-weight: bold;
+}
+")
+
+;; The dark-mode stylesheet.
+(def css-dark "
+body {
+  background-color: #1b1926;
+  color: #ccc;
+}
+
+.box {
+  background-color: #3a3042;
+  border-color: #554057;
+}
+
+a, a:visited {
+  color: #669;
+}
+
+form input,
+form textarea {
+  background-color: #21202f;
+  color: #ccc;
+  border: 1px solid #554057;
 }
 ")
 
@@ -460,10 +484,20 @@ p.error {
      [:input {:type :submit
               :value (msgcat :submit-button)}]]]])
 
+(defn dark-mode-media-query
+  "Takes `light`, `dark`, `reverse`, or a different string.
+  Returns the media query for the dark-mode CSS `<style>` element."
+  [theme]
+  (case theme
+    "light" "not all"
+    "dark" "all"
+    "reverse" "(prefers-color-scheme: light)"
+    "(prefers-color-scheme: dark)"))
+
 (defn html-view
   "Takes the Hiccup markup in `body` and returns a full HTML page
   plus the headers for CGI as text."
-  [status body & {:keys [title-prefix]}]
+  [status body & {:keys [theme title-prefix]}]
   (str
    "Content-Type: text/html\r\n"
    "Status: " status "\r\n\r\n"
@@ -481,23 +515,25 @@ p.error {
           ""
           (str title-prefix " - "))
         (msgcat :title))]
-      [:style (joker.hiccup/raw-string css)]]
+      [:style (joker.hiccup/raw-string css)]
+      [:style {:media (dark-mode-media-query theme)} (joker.hiccup/raw-string css-dark)]]
      body])))
 
 (defn error-view
   "Returns an HTML page with the given error message."
-  [status heading message]
+  [status heading message & {:keys [theme]}]
   (html-view
    status
    [:body
     [:h1 heading]
     [:p {:class :error} message]]
+   :theme theme
    :title-prefix status))
 
 (defn normal-view
   "Returns an HTML page with the guestbook entries and optionally
   the submission form."
-  [db script-name show-post-form captcha]
+  [& {:keys [captcha db script-name show-post-form theme]}]
   (html-view
    (:200 statuses)
    [:body
@@ -509,7 +545,15 @@ p.error {
       (form script-name captcha)
       [:h2 (msgcat :posting-disabled)])
     (when-not (joker.string/blank? footer)
-      [:footer (joker.hiccup/raw-string footer)])]))
+      [:footer (joker.hiccup/raw-string footer)])]
+   :theme theme))
+
+(defn parse-query-join-values
+  "Parse an HTTP query and join the values of its repeat arguments."
+  [s]
+  (-> (joker.url/parse-query s)
+      (update-vals
+       (fn [strs] (joker.string/join strs)))))
 
 (defn handle-post
   "Process a POST request.
@@ -520,11 +564,10 @@ p.error {
              input-stream
              page-captcha
              remote
-             script-name]}]
+             script-name
+             theme]}]
   (let [input (joker.io/read input-stream content-length)
-        query-without-defaults (-> (joker.url/parse-query input)
-                                   (update-vals
-                                    (fn [strs] (joker.string/join strs))))
+        query-without-defaults (parse-query-join-values input)
         query (merge query-defaults query-without-defaults)
         too-long (check-counts query max-length)]
     (cond
@@ -573,7 +616,12 @@ p.error {
       :else
       (do
         (add-entry db current-timestamp remote query)
-        (normal-view db script-name allow-posting page-captcha)))))
+        (normal-view
+         :captcha page-captcha
+         :db db
+         :script-name script-name
+         :show-post-form allow-posting
+         :theme theme)))))
 
 (defn cgi
   "Processes a CGI request with a given database, environment-variable map,
@@ -588,8 +636,10 @@ p.error {
                            (catch Error _ 0))
           current-timestamp (unix-now)
           page-captcha (new-captcha db current-timestamp)
+          query-string (get env "QUERY_STRING" "")
           remote (get env "REMOTE_HOST" (get env "REMOTE_ADDR" ""))
-          script-name (get env "SCRIPT_NAME" "")]
+          script-name (get env "SCRIPT_NAME" "")
+          theme (get (parse-query-join-values query-string) "theme" "auto")]
       (if (= (get env "REQUEST_METHOD" "") "POST")
         (handle-post :content-length content-length
                      :current-timestamp current-timestamp
@@ -597,8 +647,14 @@ p.error {
                      :input-stream input-stream
                      :page-captcha page-captcha
                      :remote remote
-                     :script-name script-name)
-        (normal-view db script-name allow-posting page-captcha)))
+                     :script-name script-name
+                     :theme theme)
+        (normal-view
+         :captcha page-captcha
+         :db db
+         :script-name script-name
+         :show-post-form allow-posting
+         :theme theme)))
     (catch Error e
       (error-view
        (:500 statuses)
