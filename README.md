@@ -31,9 +31,10 @@ I don't know how actively I am going to maintain it.
 Expect less testing, feature development, and support
 than from a regular project.
 
-## Screenshot
+## Screenshots
 
-<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form." src="screenshot.png" width="320"></a>
+<a href="screenshot.png"><img alt="A screenshot of a webpage with three guestbook entries and a submit form." src="screenshot.png" width="35%"></a>
+<a href="screenshot-dark.png"><img alt="The same page in dark mode." src="screenshot-dark.png" width="35%"></a>
 
 ## Setup
 
