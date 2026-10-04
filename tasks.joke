@@ -5,11 +5,11 @@
 (defn- run [name & args]
   "Echo and run a command."
   (println (as-> name x
-               (joker.filepath/base x)
-               (str "$ " x " " (joker.string/join " " args))))
+             (joker.filepath/base x)
+             (str "$ " x " " (joker.string/join " " args))))
   (joker.os/exec name
                  {:args args
-                  :std *in*
+                  :stdin *in*
                   :stdout *out*
                   :stderr *err*}))
 
