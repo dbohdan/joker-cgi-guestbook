@@ -1,0 +1,29 @@
+(ns tasks)
+
+(ns-unmap 'tasks 'test)
+
+(defn- run [name & args]
+  "Echo and run a command."
+  (println (as-> name x
+               (joker.filepath/base x)
+               (str "$ " x " " (joker.string/join " " args))))
+  (joker.os/exec name
+                 {:args args
+                  :std *in*
+                  :stdout *out*
+                  :stderr *err*}))
+
+(defn guestbook
+  "Run guestbook (print index page)"
+  []
+  (run (joker.os/executable) "guestbook.joke"))
+
+(defn test
+  "Run tests"
+  []
+  (run (joker.os/executable) "tests.joke"))
+
+(defn default
+  "Run default task"
+  []
+  (test))
